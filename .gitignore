@@ -1,0 +1,26 @@
+# .gitignore
+# Ignore all data but keep .dvc metadata
+data/*
+!data/*.dvc
+
+# Ignore all models but keep .dvc metadata
+models/*
+!models/*.dvc
+
+# DVC cache
+/.dvc/cache/
+/.dvc/tmp/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.env/
+.venv/
+
+# OS-specific
+.DS_Store
+Thumbs.db
