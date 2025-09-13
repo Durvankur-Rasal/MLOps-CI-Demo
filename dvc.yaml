@@ -2,9 +2,10 @@ stages:
   train_model:
     cmd: python src/train.py
     deps:
-      - src/train.py
-      - data/iris.csv
+    - data/iris.csv
+    - src/train.py
     outs:
-      - models/model.pkl
+    - models/model.pkl
     metrics:
-      - metrics.txt
+    - metrics.txt:
+        cache: false

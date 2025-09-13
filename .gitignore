@@ -20,7 +20,15 @@ __pycache__/
 # Virtual environments
 .env/
 .venv/
+venv/
+env/
 
 # OS-specific
 .DS_Store
 Thumbs.db
+
+# MLflow artifacts
+mlruns/
+
+# Metrics file (tracked by DVC)
+# /metrics.txt
