@@ -122,8 +122,10 @@ jobs:
           DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_USER_TOKEN }}
         run: |
           echo "🚂 Starting model training..."
-          mkdir -p models
-          python src/train.py
+          # mkdir -p models
+          # python src/train.py
+          dvc repro
+
       
       - name: "📊 Validate model performance"
         run: |
