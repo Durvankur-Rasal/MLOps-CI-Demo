@@ -1,8 +1,20 @@
-dvc
+# Core ML dependencies
 scikit-learn
 pandas
 numpy
 matplotlib
 joblib
+
+# MLOps tools
+dvc
 mlflow<3
+dagshub
+
+# Testing and CI/CD
+pytest
+flake8
+black
+
+# Additional utilities
+requests
 

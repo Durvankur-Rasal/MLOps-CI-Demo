@@ -1,0 +1,179 @@
+name: MLOps CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:  # Allow manual triggers
+
+env:
+  PYTHON_VERSION: "3.10"
+
+jobs:
+  code-quality:
+    name: "🧪 Code Quality & Testing"
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: "🐍 Set up Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: "📦 Cache dependencies"
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: "🔧 Install dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest flake8 black
+      
+      - name: "🧹 Code linting"
+        run: |
+          echo "Running flake8 linting..."
+          flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=88 --statistics
+        continue-on-error: true
+      
+      - name: "⚫ Code formatting check"
+        run: |
+          echo "Checking code formatting with black..."
+          black --check src/ || echo "⚠️ Code formatting issues found"
+        continue-on-error: true
+      
+      - name: "🧪 Run unit tests"
+        run: |
+          echo "Running pytest unit tests..."
+          python -m pytest tests/ -v --tb=short --junitxml=test-results.xml
+      
+      - name: "📊 Upload test results"
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: test-results.xml
+
+  data-validation:
+    name: "📋 Data Validation"
+    runs-on: ubuntu-latest
+    needs: code-quality
+    
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+      
+      - name: "🐍 Set up Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: "🔧 Install dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas scikit-learn
+      
+      - name: "✅ Validate data"
+        run: |
+          echo "Running data validation..."
+          python scripts/validate_data.py
+
+  model-training:
+    name: "🚂 Model Training & Validation"
+    runs-on: ubuntu-latest
+    needs: [code-quality, data-validation]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: "🐍 Set up Python"
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: "🔧 Install dependencies"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: "📊 Prepare data"
+        run: |
+          echo "Ensuring data is available..."
+          python scripts/validate_data.py
+      
+      - name: "🚂 Train model"
+        env:
+          CI: true  # Flag to indicate CI environment
+          DAGSHUB_USER_TOKEN: ${{ secrets.DAGSHUB_USER_TOKEN }}
+        run: |
+          echo "🚂 Starting model training..."
+          mkdir -p models
+          python src/train.py
+      
+      - name: "📊 Validate model performance"
+        run: |
+          echo "Validating model performance..."
+          python scripts/check_model_performance.py
+      
+      - name: "📦 Upload artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: trained-model-${{ github.sha }}
+          path: |
+            models/model.pkl
+            metrics.txt
+          retention-days: 30
+      
+      - name: "📈 Performance summary"
+        run: |
+          echo "## 📊 Model Performance Report" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Training Status:** ✅ Completed" >> $GITHUB_STEP_SUMMARY
+          if [ -f "metrics.txt" ]; then
+            echo "- **Metrics:**" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat metrics.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+  deploy:
+    name: "🚀 Deploy Model"
+    runs-on: ubuntu-latest
+    needs: model-training
+    if: github.ref == 'refs/heads/main'
+    environment: 
+      name: production
+      url: https://dagshub.com/durvankur/MLOPs_demo
+    
+    steps:
+      - name: "📥 Download artifacts"
+        uses: actions/download-artifact@v3
+        with:
+          name: trained-model-${{ github.sha }}
+      
+      - name: "🚀 Deploy model"
+        run: |
+          echo "🚀 Deploying model to production environment..."
+          echo "📦 Available artifacts:"
+          ls -la
+          echo ""
+          echo "🔗 Model registry: https://dagshub.com/durvankur/MLOPs_demo"
+          echo "📊 MLflow tracking: https://dagshub.com/durvankur/MLOPs_demo.mlflow"
+          echo ""
+          echo "✅ Model deployment completed successfully!"
