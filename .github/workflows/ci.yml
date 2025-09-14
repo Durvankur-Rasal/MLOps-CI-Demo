@@ -111,7 +111,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
       
-      - name: "📊 Prepare data"
+      - name: "Prepare data"
         run: |
           echo "Ensuring data is available..."
           python scripts/validate_data.py
